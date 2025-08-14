@@ -11,7 +11,7 @@ const PORT = process.env.PORT || 5000;
 
 // Middleware
 app.use(cors({
-  origin: 'http://localhost:5173', // your Vite frontend
+  origin: 'https://hate-speech-toxic-comment-detection-one.vercel.app/'||'http://localhost:5173', // your Vite frontend
   credentials: true
 }));
 app.use(express.json());
