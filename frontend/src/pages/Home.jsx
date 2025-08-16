@@ -1,8 +1,9 @@
 // src/pages/Home.jsx
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { ShieldCheckIcon, SparklesIcon, ClockIcon } from '@heroicons/react/24/outline';
+import { ShieldCheckIcon, SparklesIcon, ClockIcon, ChartBarIcon, ExclamationTriangleIcon, ArrowPathIcon } from '@heroicons/react/24/outline';
 import toast from 'react-hot-toast';
+import { useAuth } from '../hooks/useAuth'; // Import useAuth
 
 // Components
 import Card from '../components/ui/Card';
@@ -11,16 +12,33 @@ import LoadingSpinner from '../components/common/LoadingSpinner';
 import ToxicityMeter from '../components/charts/ToxicityMeter';
 
 // Services
-import { analyzeToxicity } from '../services/toxicityService';
-
-// Utils
-import { EXAMPLE_TEXTS } from '../utils/constants';
+import api from '../services/api'; // Use the central api instance
 
 const Home = () => {
   const [text, setText] = useState('');
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [results, setResults] = useState(null);
   const [analysisTime, setAnalysisTime] = useState(0);
+  const [stats, setStats] = useState({ total: 0, toxic: 0 });
+  const [isLoadingExample, setIsLoadingExample] = useState(false); // --- NEW: State for loading example
+
+  const { user } = useAuth();
+
+  useEffect(() => {
+    const fetchStats = async () => {
+      try {
+        const { data } = await api.get('/predict/stats');
+        setStats({
+          total: data.totalAnalyzed,
+          toxic: data.toxicDetected
+        });
+      } catch (error) {
+        console.error("Failed to fetch stats:", error);
+      }
+    };
+    fetchStats();
+  }, []);
+
 
   const handleAnalyze = async () => {
     if (!text.trim()) {
@@ -32,16 +50,24 @@ const Home = () => {
     const startTime = Date.now();
 
     try {
-      // Simulate API call
-      const analysisResults = await analyzeToxicity(text);
+      const payload = { text, userId: user ? user.id : null };
+      const { data: analysisResults } = await api.post('/predict', payload);
+      
       const endTime = Date.now();
       
       setResults(analysisResults);
-      setAnalysisTime((endTime - startTime) / 1000);
+      setAnalysisTime(((endTime - startTime) / 1000).toFixed(2));
       
       toast.success('Analysis completed successfully!');
+
+      if (user) {
+         // Fetch the latest stats from the server to ensure consistency
+         const { data } = await api.get('/predict/stats');
+         setStats({ total: data.totalAnalyzed, toxic: data.toxicDetected });
+      }
+
     } catch (error) {
-      toast.error('Analysis failed. Please try again.');
+      toast.error(error?.response?.data?.message || 'Analysis failed. Please try again.');
       console.error('Analysis error:', error);
     } finally {
       setIsAnalyzing(false);
@@ -54,9 +80,19 @@ const Home = () => {
     setAnalysisTime(0);
   };
 
-  const loadExample = () => {
-    const randomExample = EXAMPLE_TEXTS[Math.floor(Math.random() * EXAMPLE_TEXTS.length)];
-    setText(randomExample);
+  // --- UPDATED: Load example from the backend ---
+  const loadExample = async () => {
+    setIsLoadingExample(true);
+    try {
+      const { data } = await api.get('/predict/example');
+      setText(data.comment_text);
+      setResults(null); // Clear previous results
+    } catch (error) {
+      toast.error('Could not load example. Please try again.');
+      console.error("Failed to load example:", error);
+    } finally {
+      setIsLoadingExample(false);
+    }
   };
 
   const containerVariants = {
@@ -160,7 +196,7 @@ const Home = () => {
             <Button
               onClick={handleClear}
               variant="secondary"
-              disabled={isAnalyzing}
+              disabled={isAnalyzing || isLoadingExample}
             >
               Clear
             </Button>
@@ -168,13 +204,17 @@ const Home = () => {
             <Button
               onClick={loadExample}
               variant="outline"
-              disabled={isAnalyzing}
+              disabled={isAnalyzing || isLoadingExample}
             >
-              Load Example
+               {isLoadingExample ? (
+                <LoadingSpinner className="w-4 h-4 mr-2" />
+              ) : (
+                <ArrowPathIcon className="w-4 h-4 mr-2" />
+              )}
+              {isLoadingExample ? 'Loading...' : 'Load Example'}
             </Button>
           </div>
 
-          {/* Loading State */}
           {isAnalyzing && (
             <motion.div
               initial={{ opacity: 0 }}
@@ -187,7 +227,6 @@ const Home = () => {
             </motion.div>
           )}
 
-          {/* Results Section */}
           {results && !isAnalyzing && (
             <motion.div
               initial={{ opacity: 0, y: 20 }}
@@ -207,12 +246,10 @@ const Home = () => {
                 </div>
               </div>
 
-              {/* Toxicity Meter */}
               <div className="mb-6">
-                <ToxicityMeter score={results.overallScore} />
+                <ToxicityMeter score={results.overallScore / 100} />
               </div>
 
-              {/* Analyzed Text Preview */}
               <div className="bg-white rounded-lg p-4 mb-6 border">
                 <h4 className="font-medium text-gray-700 mb-2">Analyzed Text:</h4>
                 <p className="text-gray-600 italic">
@@ -220,24 +257,23 @@ const Home = () => {
                 </p>
               </div>
 
-              {/* Category Breakdown */}
               <div>
                 <h4 className="font-medium text-gray-700 mb-4">Category Breakdown:</h4>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                   {Object.entries(results.categories).map(([category, score]) => {
-                    const percentage = Math.round(score * 100);
-                    let colorClass = 'text-green-600 bg-green-100';
+                    const percentage = Math.round(score); 
                     
-                    if (percentage > 30) {
+                    let colorClass = 'text-green-600 bg-green-100';
+                    if (percentage > 75) {
                       colorClass = 'text-red-600 bg-red-100';
-                    } else if (percentage > 10) {
+                    } else if (percentage > 40) {
                       colorClass = 'text-yellow-600 bg-yellow-100';
                     }
 
                     return (
                       <div key={category} className="bg-white rounded-lg p-4 text-center shadow-sm">
                         <div className="font-medium text-gray-700 mb-2 capitalize">
-                          {category.replace(/([A-Z])/g, ' $1').trim()}
+                          {category.replace(/_/g, ' ')}
                         </div>
                         <div className={`text-2xl font-bold ${colorClass} rounded-full w-16 h-16 flex items-center justify-center mx-auto`}>
                           {percentage}%
@@ -252,31 +288,22 @@ const Home = () => {
         </Card>
       </motion.div>
 
-      {/* Quick Stats */}
       <motion.div
         variants={itemVariants}
         initial="hidden"
         animate="visible"
-        className="grid grid-cols-1 md:grid-cols-4 gap-6"
+        className="grid grid-cols-1 md:grid-cols-2 gap-6"
       >
         <Card className="text-center p-6">
-          <div className="text-3xl font-bold text-blue-600 mb-2">2,847</div>
-          <div className="text-gray-600">Total Analyzed</div>
+          <ChartBarIcon className="w-8 h-8 mx-auto text-blue-500 mb-2" />
+          <div className="text-3xl font-bold text-blue-600 mb-2">{stats.total.toLocaleString()}</div>
+          <div className="text-gray-600">Total Analyses by All Users</div>
         </Card>
         
         <Card className="text-center p-6">
-          <div className="text-3xl font-bold text-red-600 mb-2">342</div>
-          <div className="text-gray-600">Toxic Detected</div>
-        </Card>
-        
-        <Card className="text-center p-6">
-          <div className="text-3xl font-bold text-green-600 mb-2">94.7%</div>
-          <div className="text-gray-600">Accuracy</div>
-        </Card>
-        
-        <Card className="text-center p-6">
-          <div className="text-3xl font-bold text-purple-600 mb-2">0.23s</div>
-          <div className="text-gray-600">Avg Response</div>
+          <ExclamationTriangleIcon className="w-8 h-8 mx-auto text-red-500 mb-2" />
+          <div className="text-3xl font-bold text-red-600 mb-2">{stats.toxic.toLocaleString()}</div>
+          <div className="text-gray-600">Toxic Texts Detected</div>
         </Card>
       </motion.div>
     </div>

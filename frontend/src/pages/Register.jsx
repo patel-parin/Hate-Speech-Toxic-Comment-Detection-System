@@ -8,7 +8,7 @@ import Card from '../components/ui/Card'
 
 const Register = () => {
   const [formData, setFormData] = useState({
-    name: '',
+    username: '',
     email: '',
     password: '',
     confirmPassword: ''
@@ -38,9 +38,9 @@ const Register = () => {
     }
 
     try {
-      const result = await register(formData.name, formData.email, formData.password)
+      const result = await register(formData.username, formData.email, formData.password)
       if (result.success) {
-        navigate('/dashboard')
+        navigate('/')
       } else {
         setError(result.error)
       }
@@ -73,8 +73,8 @@ const Register = () => {
             <Input
               label="Full Name"
               type="text"
-              name="name"
-              value={formData.name}
+              name="username"
+              value={formData.username}
               onChange={handleChange}
               placeholder="Enter your full name"
               required

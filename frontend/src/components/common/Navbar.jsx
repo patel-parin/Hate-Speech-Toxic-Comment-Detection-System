@@ -105,9 +105,9 @@ const Navbar = () => {
                       isScrolled ? 'bg-gray-100' : 'bg-white/10'
                     }`}
                   >
-                    <div className="w-8 h-8 bg-gradient-to-r from-yellow-400 to-orange-500 rounded-full flex items-center justify-center">
+                    <div className="w-35 h- bg-gradient-to-r from-yellow-480 to-orange-500 rounded-full flex items-center justify-center">
                       <span className="text-white text-sm font-bold">
-                        {user?.name?.[0]?.toUpperCase() || 'U'}
+                        {user?.username?.toUpperCase() || 'U'}
                       </span>
                     </div>
                     <span
@@ -177,7 +177,7 @@ const Navbar = () => {
                   <div className="flex items-center space-x-3 px-3 py-3 border-b border-gray-200">
                     <div className="w-10 h-10 bg-gradient-to-r from-yellow-400 to-orange-500 rounded-full flex items-center justify-center">
                       <span className="text-white font-bold">
-                        {user?.name?.[0]?.toUpperCase() || 'U'}
+                        {username?.name?.[0]?.toUpperCase() || 'U'}
                       </span>
                     </div>
                     <div>

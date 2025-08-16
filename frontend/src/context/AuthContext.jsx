@@ -169,19 +169,125 @@
 
 
 // src/context/AuthContext.jsx
+// import React, { createContext, useContext, useState, useEffect } from 'react';
+// import toast from 'react-hot-toast';
+// import api from '../services/api'; // <-- ensure this path is correct for your project
+
+// const AuthContext = createContext();
+
+// export const useAuth = () => {
+//   const context = useContext(AuthContext);
+//   if (!context) {
+//     throw new Error('useAuth must be used within an AuthProvider');
+//   }
+//   return context;
+// };
+
+// export const AuthProvider = ({ children }) => {
+//   const [user, setUser] = useState(null);
+//   const [isLoading, setIsLoading] = useState(true);
+//   const [isAuthenticated, setIsAuthenticated] = useState(false);
+
+//   useEffect(() => {
+//     const token = localStorage.getItem('authToken');
+//     const userData = localStorage.getItem('userData');
+
+//     if (token && userData) {
+//       try {
+//         const parsedUser = JSON.parse(userData);
+//         setUser(parsedUser);
+//         setIsAuthenticated(true);
+//       } catch {
+//         localStorage.removeItem('authToken');
+//         localStorage.removeItem('userData');
+//       }
+//     }
+
+//     setIsLoading(false);
+//   }, []);
+
+//   const login = async (email, password) => {
+//     setIsLoading(true);
+//     try {
+//       const { data } = await api.post('/auth/login', { email, password });
+//       // Expecting backend to return: { user, token }
+//       const { user, token } = data;
+
+//       localStorage.setItem('authToken', token);
+//       localStorage.setItem('userData', JSON.stringify(user));
+//       setUser(user);
+//       setIsAuthenticated(true);
+//       toast.success('Login successful!');
+//       return { success: true, user };
+//     } catch (error) {
+//       const msg = error?.response?.data?.message || 'Login failed. Please check your credentials.';
+//       toast.error(msg);
+//       return { success: false, error: msg };
+//     } finally {
+//       setIsLoading(false);
+//     }
+//   };
+
+//   const register = async (username, email, password) => {
+//     setIsLoading(true);
+//     try {
+//       const { data } = await api.post('/auth/register', { username, email, password });
+//       // Expecting backend to return: { user, token }
+//       const { user, token } = data;
+
+//       localStorage.setItem('authToken', token);
+//       localStorage.setItem('userData', JSON.stringify(user));
+//       setUser(user);
+//       setIsAuthenticated(true);
+//       toast.success('Registration successful!');
+//       return { success: true, user };
+//     } catch (error) {
+//       const msg = error?.response?.data?.message || 'Registration failed. Please try again.';
+//       toast.error(msg);
+//       return { success: false, error: msg };
+//     } finally {
+//       setIsLoading(false);
+//     }
+//   };
+
+//   const logout = () => {
+//     localStorage.removeItem('authToken');
+//     localStorage.removeItem('userData');
+//     setUser(null);
+//     setIsAuthenticated(false);
+//     toast.success('Logged out successfully');
+//   };
+
+//   const updateUser = (updatedData) => {
+//     const updatedUser = { ...user, ...updatedData };
+//     setUser(updatedUser);
+//     localStorage.setItem('userData', JSON.stringify(updatedUser));
+//     toast.success('Profile updated successfully');
+//   };
+
+//   const value = {
+//     user,
+//     isLoading,
+//     isAuthenticated,
+//     login,
+//     register,
+//     logout,
+//     updateUser,
+//   };
+
+//   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+// };
+
+// export { AuthContext };
+
+
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import toast from 'react-hot-toast';
-import api from '../services/api'; // <-- ensure this path is correct for your project
+import api from '../services/api';
 
 const AuthContext = createContext();
 
-export const useAuth = () => {
-  const context = useContext(AuthContext);
-  if (!context) {
-    throw new Error('useAuth must be used within an AuthProvider');
-  }
-  return context;
-};
+export const useAuth = () => useContext(AuthContext);
 
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
@@ -189,93 +295,61 @@ export const AuthProvider = ({ children }) => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
 
   useEffect(() => {
-    const token = localStorage.getItem('authToken');
-    const userData = localStorage.getItem('userData');
+  let isMounted = true;
 
-    if (token && userData) {
-      try {
-        const parsedUser = JSON.parse(userData);
-        setUser(parsedUser);
+  const checkAuth = async () => {
+    try {
+      const { data } = await api.get('/auth/me', { withCredentials: true });
+      if (isMounted) {
+        setUser(data.user);
         setIsAuthenticated(true);
-      } catch {
-        localStorage.removeItem('authToken');
-        localStorage.removeItem('userData');
+      }
+    } catch {
+      if (isMounted) {
+        setUser(null);
+        setIsAuthenticated(false);
+      }
+    } finally {
+      if (isMounted) {
+        setIsLoading(false);
       }
     }
+  };
 
-    setIsLoading(false);
-  }, []);
+  checkAuth();
+  return () => { isMounted = false; };
+}, []);
 
   const login = async (email, password) => {
     setIsLoading(true);
     try {
-      const { data } = await api.post('/auth/login', { email, password });
-      // Expecting backend to return: { user, token }
-      const { user, token } = data;
-
-      localStorage.setItem('authToken', token);
-      localStorage.setItem('userData', JSON.stringify(user));
-      setUser(user);
+      await api.post('/auth/login', { email, password }, { withCredentials: true });
+      // Now fetch the user profile
+      const { data } = await api.get('/auth/me', { withCredentials: true });
+      setUser(data.user);
       setIsAuthenticated(true);
       toast.success('Login successful!');
-      return { success: true, user };
-    } catch (error) {
-      const msg = error?.response?.data?.message || 'Login failed. Please check your credentials.';
-      toast.error(msg);
-      return { success: false, error: msg };
+      return { success: true };
+    } catch (err) {
+      toast.error(err?.response?.data?.message || 'Login failed');
+      return { success: false };
     } finally {
       setIsLoading(false);
     }
   };
 
-  const register = async (name, email, password) => {
-    setIsLoading(true);
-    try {
-      const { data } = await api.post('/auth/register', { name, email, password });
-      // Expecting backend to return: { user, token }
-      const { user, token } = data;
-
-      localStorage.setItem('authToken', token);
-      localStorage.setItem('userData', JSON.stringify(user));
-      setUser(user);
-      setIsAuthenticated(true);
-      toast.success('Registration successful!');
-      return { success: true, user };
-    } catch (error) {
-      const msg = error?.response?.data?.message || 'Registration failed. Please try again.';
-      toast.error(msg);
-      return { success: false, error: msg };
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const logout = () => {
-    localStorage.removeItem('authToken');
-    localStorage.removeItem('userData');
+  const logout = async () => {
+    await api.post('/auth/logout', {}, { withCredentials: true });
     setUser(null);
     setIsAuthenticated(false);
     toast.success('Logged out successfully');
   };
 
-  const updateUser = (updatedData) => {
-    const updatedUser = { ...user, ...updatedData };
-    setUser(updatedUser);
-    localStorage.setItem('userData', JSON.stringify(updatedUser));
-    toast.success('Profile updated successfully');
-  };
-
-  const value = {
-    user,
-    isLoading,
-    isAuthenticated,
-    login,
-    register,
-    logout,
-    updateUser,
-  };
-
-  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+  return (
+    <AuthContext.Provider value={{ user, isLoading, isAuthenticated, login, logout }}>
+      {children}
+    </AuthContext.Provider>
+  );
 };
 
 export { AuthContext };

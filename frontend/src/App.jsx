@@ -4,7 +4,7 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import { Toaster } from 'react-hot-toast';
 
 // Context Providers
-import { AuthProvider } from './context/AuthContext';
+import { AuthProvider, useAuth } from './context/AuthContext';
 import { ThemeProvider } from './context/ThemeContext';
 
 // Components
@@ -15,15 +15,27 @@ import Footer from './components/common/Footer';
 import Home from './pages/Home';
 import Dashboard from './pages/Dashboard';
 import History from './pages/History';
-// import BatchProcess from './pages/BatchProcess';
-// import ApiDocs from './pages/ApiDocs';
-// import Settings from './pages/Settings';
 import Login from './pages/Login';
 import Register from './pages/Register';
 
 // Styles
 import './styles/globals.css';
 import './styles/animations.css';
+
+// Protected Route Component
+const ProtectedRoute = ({ children }) => {
+  const { isAuthenticated, isLoading } = useAuth();
+
+  if (isLoading) {
+    return <div className="text-white text-center mt-10">Loading...</div>;
+  }
+
+  if (!isAuthenticated) {
+    return <Navigate to="/login" replace />;
+  }
+
+  return children;
+};
 
 function App() {
   return (
@@ -32,23 +44,34 @@ function App() {
         <Router>
           <div className="min-h-screen bg-gradient-to-br from-indigo-500 via-purple-500 to-purple-700">
             <Navbar />
-            
+
             <main className="pt-20 min-h-screen">
               <Routes>
                 <Route path="/" element={<Home />} />
-                <Route path="/dashboard" element={<Dashboard />} />
-                <Route path="/history" element={<History />} />
-                {/* <Route path="/batch" element={<BatchProcess />} /> */}
-                {/* <Route path="/api" element={<ApiDocs />} /> */}
-                {/* <Route path="/settings" element={<Settings />} /> */}
+                <Route
+                  path="/dashboard"
+                  element={
+                    <ProtectedRoute>
+                      <Dashboard />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/history"
+                  element={
+                    <ProtectedRoute>
+                      <History />
+                    </ProtectedRoute>
+                  }
+                />
                 <Route path="/login" element={<Login />} />
                 <Route path="/register" element={<Register />} />
                 <Route path="*" element={<Navigate to="/" replace />} />
               </Routes>
             </main>
-            
+
             <Footer />
-            
+
             {/* Toast notifications */}
             <Toaster
               position="top-right"
