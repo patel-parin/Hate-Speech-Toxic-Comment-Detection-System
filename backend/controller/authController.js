@@ -126,36 +126,32 @@ const User = require("../model/user");
 const jwt = require("jsonwebtoken");
 const bcrypt = require("bcryptjs");
 
-const JWT_SECRET = process.env.JWT_SECRET || "yoursecretkey"; // put this in .env
-const JWT_EXPIRES = "7d"; // token expiry
-
-// Helper: Generate JWT
-const generateToken = (userId) => {
-  return jwt.sign({ id: userId }, JWT_SECRET, { expiresIn: JWT_EXPIRES });
+// Helper to generate token
+const generateToken = (user) => {
+  return jwt.sign({ id: user._id }, process.env.JWT_SECRET, {
+    expiresIn: "7d",
+  });
 };
 
 // Common cookie options
 const cookieOptions = {
   httpOnly: true,
-  secure: true,        // required on Vercel (HTTPS)
-  sameSite: "none",    // allow cross-site cookie (frontend + backend on different domains)
+  secure: process.env.NODE_ENV === "production", // true only on Vercel
+  sameSite: process.env.NODE_ENV === "production" ? "none" : "lax", // lax for localhost
   maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
 };
 
-// Register User
+// REGISTER
 exports.registerUser = async (req, res) => {
   try {
     const { username, email, password } = req.body;
 
-    // Check existing user
     const existingUser = await User.findOne({ email });
     if (existingUser) {
       return res.status(400).json({ error: "Email already registered" });
     }
 
-    // Hash password
     const hashedPassword = await bcrypt.hash(password, 10);
-
     const newUser = new User({
       username,
       email,
@@ -163,14 +159,12 @@ exports.registerUser = async (req, res) => {
     });
     await newUser.save();
 
-    // Create token
-    const token = generateToken(newUser._id);
+    const token = generateToken(newUser);
 
-    // Set token in HTTP-only cookie
     res.cookie("token", token, cookieOptions);
 
     res.status(201).json({
-      message: "User registered successfully",
+      message: "User created successfully!",
       user: {
         id: newUser._id,
         username: newUser.username,
@@ -178,33 +172,26 @@ exports.registerUser = async (req, res) => {
       },
     });
   } catch (error) {
-    res.status(500).json({ error: "Failed to register user." });
+    res.status(500).json({ error: "Failed to register user" });
   }
 };
 
-// Login User
+// LOGIN
 exports.loginUser = async (req, res) => {
   try {
     const { email, password } = req.body;
 
     const user = await User.findOne({ email });
-    if (!user) {
-      return res.status(401).json({ error: "Invalid credentials" });
-    }
+    if (!user) return res.status(400).json({ error: "Invalid credentials" });
 
-    // Compare password
     const isMatch = await bcrypt.compare(password, user.password);
-    if (!isMatch) {
-      return res.status(401).json({ error: "Invalid credentials" });
-    }
+    if (!isMatch) return res.status(400).json({ error: "Invalid credentials" });
 
-    // Create token
-    const token = generateToken(user._id);
+    const token = generateToken(user);
 
-    // Set token in HTTP-only cookie
     res.cookie("token", token, cookieOptions);
 
-    res.status(200).json({
+    res.json({
       message: "Login successful",
       user: {
         id: user._id,
@@ -213,32 +200,17 @@ exports.loginUser = async (req, res) => {
       },
     });
   } catch (error) {
-    res.status(500).json({ error: "Login failed." });
+    res.status(500).json({ error: "Failed to login" });
   }
 };
 
-// Logout User
+// LOGOUT
 exports.logoutUser = (req, res) => {
   res.clearCookie("token", {
     httpOnly: true,
-    secure: true,
-    sameSite: "none",
+    secure: process.env.NODE_ENV === "production",
+    sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
   });
+
   res.json({ message: "Logged out successfully" });
-};
-
-// Get Current User
-exports.getMe = async (req, res) => {
-  try {
-    const token = req.cookies.token;
-    if (!token) return res.status(401).json({ error: "Not authenticated" });
-
-    const decoded = jwt.verify(token, JWT_SECRET);
-    const user = await User.findById(decoded.id).select("-password");
-    if (!user) return res.status(404).json({ error: "User not found" });
-
-    res.json({ user });
-  } catch (error) {
-    res.status(401).json({ error: "Invalid or expired token" });
-  }
 };
