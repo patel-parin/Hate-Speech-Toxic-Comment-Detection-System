@@ -1,43 +1,30 @@
-import { createContext, useState } from 'react';
-import axios from 'axios';
+import { createContext, useContext, useState } from 'react';
+import useApi from './useApi';
 
-export const AuthContext = createContext();
+const AuthContext = createContext();
 
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
+  const { post, get } = useApi();
 
   const login = async (email, password) => {
     try {
-      // Login request with credentials
-      await axios.post(
-        'https://hate-speech-toxic-comment-detection.vercel.app/api/auth/login',
-        { email, password },
-        { withCredentials: true } // ✅ important for cookies
-      );
+      const { data, error } = await post('/auth/login', { email, password });
+      if (error) return { success: false, error };
 
-      // Fetch authenticated user
-      const res = await axios.get(
-        'https://hate-speech-toxic-comment-detection.vercel.app/api/auth/me',
-        { withCredentials: true } // ✅ include cookie
-      );
+      const { data: me, error: meError } = await get('/auth/me');
+      if (meError) return { success: false, error: meError };
 
-      setUser(res.data); // store user in context
-      return { success: true, data: res.data };
+      setUser(me);
+      return { success: true, data: me };
     } catch (err) {
-      return {
-        success: false,
-        error: err.response?.data?.error || 'Login failed',
-      };
+      return { success: false, error: err.message || 'Login failed' };
     }
   };
 
   const logout = async () => {
     try {
-      await axios.post(
-        'https://hate-speech-toxic-comment-detection.vercel.app/api/auth/logout',
-        {},
-        { withCredentials: true }
-      );
+      await post('/auth/logout');
       setUser(null);
     } catch (err) {
       console.error('Logout failed', err);
@@ -50,3 +37,14 @@ export const AuthProvider = ({ children }) => {
     </AuthContext.Provider>
   );
 };
+
+// Hook to access AuthContext
+export const useAuth = () => {
+  const context = useContext(AuthContext);
+  if (!context) {
+    throw new Error('useAuth must be used within AuthProvider');
+  }
+  return context;
+};
+
+export { AuthContext };
