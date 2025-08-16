@@ -1,7 +1,7 @@
 import { createContext, useContext, useState } from 'react';
 import useApi from './useApi';
 
-const AuthContext = createContext();
+export const AuthContext = createContext();
 
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
@@ -41,10 +41,6 @@ export const AuthProvider = ({ children }) => {
 // Hook to access AuthContext
 export const useAuth = () => {
   const context = useContext(AuthContext);
-  if (!context) {
-    throw new Error('useAuth must be used within AuthProvider');
-  }
+  if (!context) throw new Error('useAuth must be used within AuthProvider');
   return context;
 };
-
-export { AuthContext };
