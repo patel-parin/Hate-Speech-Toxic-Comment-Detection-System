@@ -12,7 +12,8 @@ const AnalysisSchema = new mongoose.Schema({
       threat: Number,
       insult: Number,
       identity_hate: Number
-    }
+    },
+    analysisTime: Number
   },
   createdAt: { type: Date, default: Date.now },
 });

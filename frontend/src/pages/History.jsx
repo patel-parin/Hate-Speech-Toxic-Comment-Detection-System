@@ -225,9 +225,18 @@ const History = () => {
                       <>
                         <div className="mb-6 flex justify-center"> <ToxicityMeter score={selectedItem.results.overallScore / 100} /> </div>
                         <div className="bg-white/5 rounded-lg p-4 mb-4">
-                          <h4 className="font-medium text-white/80 mb-2">Full Text:</h4>
-                          <p className="text-white/90 break-words max-h-40 overflow-y-auto styled-scrollbar pr-2">{selectedItem.inputText}</p>
-                        </div>
+                      <div className="flex justify-between items-center mb-2">
+                        <h4 className="font-medium text-white/80">Full Text:</h4>
+                        {/* Check if analysisTime is available (and not null/undefined) */}
+                        {selectedItem.results.analysisTime != null && (
+                          <span className="text-sm text-white/70 flex items-center">
+                            <ClockIcon className="w-4 h-4 mr-1.5 flex-shrink-0" />
+                            Analysis Time: <strong className="text-white/90 ml-1">{selectedItem.results.analysisTime.toFixed(2)} ms</strong>
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-white/90 break-words max-h-40 overflow-y-auto styled-scrollbar pr-2">{selectedItem.inputText}</p>
+                    </div>
                         <div>
                           <h4 className="font-medium text-white/80 mb-2">Category Breakdown:</h4>
                           <div className="grid grid-cols-2 sm:grid-cols-3 gap-3"> {/* Adjusted grid cols */}

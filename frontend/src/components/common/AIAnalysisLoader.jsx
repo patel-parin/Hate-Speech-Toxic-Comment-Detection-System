@@ -1,143 +1,136 @@
-import React, { useState, useEffect } from 'react';
-import { motion } from 'framer-motion';
+import React, { useState, useEffect } from "react";
+import { motion, useCycle } from "framer-motion";
 
 const AIAnalysisLoader = () => {
   const [progress, setProgress] = useState(0);
+  const [showStars, toggleStars] = useCycle(false, true);
 
   useEffect(() => {
     const interval = setInterval(() => {
-      setProgress((prev) => {
-        if (prev >= 100) return 0;
-        return prev + 2;
-      });
+      setProgress((prev) => (prev >= 100 ? 0 : prev + 2));
     }, 100);
 
     return () => clearInterval(interval);
   }, []);
 
+  // Trigger star appearance every time brain pulses
+  useEffect(() => {
+    const pulseInterval = setInterval(() => {
+      toggleStars();
+    }, 1500);
+
+    return () => clearInterval(pulseInterval);
+  }, [toggleStars]);
+
   return (
-    <div className="relative w-full h-80 flex flex-col items-center justify-center">
-      {/* Dark blue and purple gradient background */}
-      <div className="absolute inset-0 bg-gradient-to-b from-purple-900 via-blue-900 to-indigo-900" />
-      
-      {/* Centered Circular Loading Icon */}
+    <div className="relative w-full h-80 flex flex-col items-center justify-center rounded-xl overflow-hidden">
+
+      {/* CLEAN AI GRADIENT BACKGROUND */}
+      <div className="absolute inset-0 bg-gradient-to-b from-[#0d1224] via-[#141a31] to-[#0d1224]" />
+
+      {/* SOFT PARTICLE FIELD */}
+      <motion.div
+        className="absolute inset-0 pointer-events-none"
+        animate={{ opacity: showStars ? 0.4 : 0.1 }}
+        transition={{ duration: 1 }}
+        style={{
+          backgroundImage:
+            "radial-gradient(white 1px, transparent 1px), radial-gradient(white 1px, transparent 1px)",
+          backgroundSize: "5px 5px",
+          backgroundPosition: "0 0, 2px 2px",
+          filter: "blur(0.5px)",
+        }}
+      />
+
+      {/* CENTER LOADER */}
       <div className="relative z-10 mb-8">
-        <div className="relative w-32 h-32">
-          {/* Outer rotating orbit rings */}
+        <div className="relative w-28 h-28">
+
+          {/* Subtle rotating ring */}
           <motion.div
-            className="absolute inset-0 w-32 h-32 border-2 rounded-full"
-            style={{
-              borderColor: 'rgba(96, 165, 250, 0.3)',
-              borderTopColor: '#60a5fa'
-            }}
+            className="absolute inset-0 w-28 h-28 rounded-full border border-white/10"
             animate={{ rotate: 360 }}
-            transition={{ duration: 4, repeat: Infinity, ease: "linear" }}
-          />
-          <motion.div
-            className="absolute -inset-3 w-38 h-38 border-2 rounded-full"
-            style={{
-              borderColor: 'rgba(139, 92, 246, 0.3)',
-              borderTopColor: '#8b5cf6'
-            }}
-            animate={{ rotate: -360 }}
-            transition={{ duration: 6, repeat: Infinity, ease: "linear" }}
+            transition={{ duration: 5, repeat: Infinity, ease: "linear" }}
           />
 
-          {/* Dark Gray Outer Ring */}
-          <svg className="w-32 h-32 transform -rotate-90" viewBox="0 0 128 128">
-            {/* Background Ring - Dark Gray */}
-            <circle
-              cx="64"
-              cy="64"
-              r="56"
-              stroke="#374151"
-              strokeWidth="8"
-              fill="none"
-            />
-            {/* Progress Ring - Bright Blue */}
+          {/* Progress ring */}
+          <svg className="w-28 h-28 transform -rotate-90" viewBox="0 0 128 128">
+            <circle cx="64" cy="64" r="54" stroke="#2a3557" strokeWidth="6" fill="none" />
             <motion.circle
               cx="64"
               cy="64"
-              r="56"
-              stroke="#3b82f6"
-              strokeWidth="8"
+              r="54"
+              stroke="#6ea8fe"
+              strokeWidth="6"
               fill="none"
               strokeLinecap="round"
-              initial={{ strokeDasharray: "0 352" }}
-              animate={{ strokeDasharray: `${(progress / 100) * 352} 352` }}
-              transition={{ duration: 0.1 }}
+              animate={{ strokeDasharray: `${(progress / 100) * 339} 339` }}
+              transition={{ duration: 0.12 }}
             />
           </svg>
-          
-          {/* Inner Purple Circle */}
-          <motion.div 
-            className="absolute inset-4 w-24 h-24 rounded-full bg-purple-500 shadow-lg"
-            animate={{
-              scale: [1, 1.05, 1],
-              boxShadow: [
-                "0 10px 25px rgba(139, 92, 246, 0.5)",
-                "0 10px 35px rgba(139, 92, 246, 0.8)",
-                "0 10px 25px rgba(139, 92, 246, 0.5)"
-              ]
-            }}
-            transition={{
-              duration: 2,
-              repeat: Infinity,
-              ease: "easeInOut"
-            }}
-          >
-            {/* Brain Icon */}
-            <div className="w-full h-full flex items-center justify-center">
-              <motion.div
-                className="text-4xl"
-                animate={{
-                  scale: [1, 1.1, 1],
-                  filter: [
-                    "drop-shadow(0 0 5px rgba(255, 255, 255, 0.3))",
-                    "drop-shadow(0 0 15px rgba(255, 255, 255, 0.8))",
-                    "drop-shadow(0 0 5px rgba(255, 255, 255, 0.3))"
-                  ]
-                }}
-                transition={{
-                  duration: 2,
-                  repeat: Infinity,
-                  ease: "easeInOut"
-                }}
-              >
-                🧠
-              </motion.div>
-            </div>
-          </motion.div>
+
+          {/* Brain pulse + synchronized star fade */}
+          <motion.div
+  className="absolute inset-5 rounded-full bg-[#182033] flex items-center justify-center"
+  animate={{
+    scale: showStars ? 1.15 : 1,
+  }}
+  transition={{
+    duration: 1.2,
+    repeat: Infinity,
+    ease: "easeInOut",
+  }}
+>
+
+  {/* 🔵 Single Premium Loading Ring */}
+ {[0, 1, 2].map((i) => (
+    <motion.div
+      key={i}
+      className="absolute w-28 h-28 rounded-full border-2 border-blue-400/30"
+      animate={{
+        scale: [1, 1.4, 1.8],
+        opacity: [0.8, 0.4, 0],
+      }}
+      transition={{
+        duration: 2.2,
+        repeat: Infinity,
+        delay: i * 0.45, // stagger effect
+        ease: "easeOut",
+      }}
+    />
+  ))}
+
+  {/* 🧠 Brain Icon */}
+  <motion.span
+    className="text-3xl relative z-10"
+    animate={{
+      scale: showStars ? [1, 1.15, 1] : [1, 0.95, 1],
+      opacity: showStars ? 1 : 0.85,
+    }}
+    transition={{
+      duration: 1.2,
+      repeat: Infinity,
+      ease: "easeInOut",
+    }}
+  >
+    🧠
+  </motion.span>
+</motion.div>
+
         </div>
       </div>
 
-      {/* Text Section */}
-      <div className="text-center z-10">
-        {/* Main Text - "Analyzing..." in bright blue */}
+      {/* TEXT */}
+      <div className="relative z-10 text-center">
         <motion.h2
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ 
-            opacity: [0.8, 1, 0.8], 
-            y: 0 
-          }}
-          transition={{ 
-            opacity: { duration: 2, repeat: Infinity, ease: "easeInOut" },
-            y: { duration: 0.8 }
-          }}
-          className="text-2xl font-medium text-blue-400 mb-3 tracking-wide"
+          className="text-xl font-medium text-blue-300 mb-2"
+          animate={{ opacity: [0.6, 1, 0.6] }}
+          transition={{ duration: 2, repeat: Infinity }}
         >
           Analyzing...
         </motion.h2>
 
-        {/* Subtitle in light gray */}
-        <motion.p
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.8, delay: 0.2 }}
-          className="text-gray-300 text-base"
-        >
-          This may take a few seconds
-        </motion.p>
+        <p className="text-gray-400 text-sm">This may take a few seconds</p>
       </div>
     </div>
   );

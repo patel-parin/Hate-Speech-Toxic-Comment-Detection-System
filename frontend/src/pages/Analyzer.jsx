@@ -43,6 +43,19 @@ const Analyzer = () => {
         };
         fetchStats();
     }, []);
+    const handleKeyDown = (e) => {
+    // Check if Enter key is pressed AND Shift key is NOT pressed
+    if (e.key === 'Enter' && !e.shiftKey) {
+      // 1. Prevent the default behavior (don't add a new line)
+      e.preventDefault();
+
+      // 2. Check if we're in a state to analyze
+      if (!isAnalyzing && text.trim() && canAnalyze()) {
+        // 3. Run the analysis
+        handleAnalyze();
+      }
+    }
+  };
 
     const handleAnalyze = async () => {
         if (!text.trim()) {
@@ -203,6 +216,7 @@ const Analyzer = () => {
                         <textarea
                             value={text}
                             onChange={(e) => setText(e.target.value)}
+                            onKeyDown={handleKeyDown}
                             className="w-full h-40 p-4 border-2 border-white/20 rounded-lg focus:border-blue-400 focus:ring-4 focus:ring-blue-400/20 transition-all duration-300 resize-none text-white placeholder-white/60 bg-white/10 backdrop-blur-sm"
                             placeholder="Type or paste your text here to check for toxic content... (Supports English, Hindi, and Hinglish)"
                             disabled={isAnalyzing || !canAnalyze()}
@@ -294,7 +308,6 @@ const Analyzer = () => {
                             <AIAnalysisLoader />
                         </motion.div>
                     )}
-
                     {results && !isAnalyzing && (
                         <motion.div
                             initial={{ opacity: 0, y: 20 }}

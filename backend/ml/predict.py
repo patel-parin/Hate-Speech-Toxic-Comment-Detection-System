@@ -51,63 +51,166 @@
 #         print(json.dumps({"error": "No input text provided"}))
 
 
+# import os
+# # CHANGE 1: This line is new. It silences TensorFlow warnings.
+# os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3' 
+# import sys
+# import json
+# import numpy as np
+# import torch
+# from transformers import AutoTokenizer, AutoModelForSequenceClassification
+# from preprocess import clean_text
+
+# # --- Base directory (you can move model folder later if needed) ---
+# BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+# MODEL_DIR = os.path.join(BASE_DIR, "..", "model", "model_xlmr", "checkpoint-28977")
+
+# # --- Load model & tokenizer ---
+# tokenizer = AutoTokenizer.from_pretrained(MODEL_DIR)
+# model = AutoModelForSequenceClassification.from_pretrained(MODEL_DIR)
+# model.eval()  # set to evaluation mode
+
+# # --- Labels (same order as during training) ---
+# labels = ["toxic", "severe_toxic", "obscene", "threat", "insult", "identity_hate"]
+
+# def predict_scores(text: str):
+#     """Predict toxicity scores using fine-tuned XLM-R model."""
+#     # Clean input text
+#     cleaned_text = clean_text(text)
+
+#     # Tokenize and move to model device
+#     inputs = tokenizer(cleaned_text, return_tensors="pt", truncation=True, padding=True, max_length=64).to(model.device)
+
+#     with torch.no_grad():
+#         outputs = model(**inputs)
+#         probs = torch.sigmoid(outputs.logits).cpu().numpy()[0]  # multi-label sigmoid activation
+
+#     # Map probabilities to labels
+#     scores = {label: float(p) for label, p in zip(labels, probs)}
+
+#     # Overall classification logic
+#     overall_score = int(max(scores.values()) * 100)
+#     if overall_score > 75:
+#         classification = "❌ TOXIC"
+#     elif overall_score > 40:
+#         classification = "⚠️ POTENTIALLY TOXIC"
+#     else:
+#         classification = "✅ NON-TOXIC"
+
+#     return {
+#         "overallScore": overall_score,
+#         "classification": classification,
+#         "categories": {label: round(score * 100) for label, score in scores.items()}
+#     }
+
+# if __name__ == "__main__":
+#     if len(sys.argv) > 1:
+#         input_text = sys.argv[1]
+#         output = predict_scores(input_text)
+#         # CHANGE 2: I removed 'ensure_ascii=False' to fix the emoji error.
+#         print(json.dumps(output)) 
+#     else:
+#         print(json.dumps({"error": "No input text provided"}))
+
+
+
 import os
-# CHANGE 1: This line is new. It silences TensorFlow warnings.
-os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3' 
 import sys
 import json
 import numpy as np
-import torch
-from transformers import AutoTokenizer, AutoModelForSequenceClassification
+from pathlib import Path
 from preprocess import clean_text
+from transformers import AutoTokenizer
+import time
 
-# --- Base directory (you can move model folder later if needed) ---
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-MODEL_DIR = os.path.join(BASE_DIR, "..", "model", "model_xlmr", "checkpoint-28977")
+# ONNX Runtime
+import onnxruntime as ort
 
-# --- Load model & tokenizer ---
-tokenizer = AutoTokenizer.from_pretrained(MODEL_DIR)
-model = AutoModelForSequenceClassification.from_pretrained(MODEL_DIR)
-model.eval()  # set to evaluation mode
+# -------------------------------------------
+# PATH SETUP
+# -------------------------------------------
+BASE_DIR = Path(__file__).resolve().parent
+MODEL_DIR = (BASE_DIR.parent / "model" / "onnx_model").resolve()
 
-# --- Labels (same order as during training) ---
-labels = ["toxic", "severe_toxic", "obscene", "threat", "insult", "identity_hate"]
+MODEL_PATH = (MODEL_DIR / "model.onnx").as_posix()
+TOKENIZER_PATH = MODEL_DIR.as_posix()
 
+# -------------------------------------------
+# LOAD TOKENIZER
+# -------------------------------------------
+tokenizer = AutoTokenizer.from_pretrained(
+    TOKENIZER_PATH,
+    local_files_only=True
+)
+
+# -------------------------------------------
+# OPTIMIZED ONNX SESSION
+# -------------------------------------------
+so = ort.SessionOptions()
+so.intra_op_num_threads = 8
+so.inter_op_num_threads = 2
+so.graph_optimization_level = ort.GraphOptimizationLevel.ORT_ENABLE_ALL
+
+session = ort.InferenceSession(
+    MODEL_PATH,
+    so,
+    providers=["CPUExecutionProvider"]
+)
+
+# -------------------------------------------
+# LABELS
+# -------------------------------------------
+labels = ["toxic", "severe_toxic", "obscene",
+          "threat", "insult", "identity_hate"]
+
+# -------------------------------------------
+# PREDICT
+# -------------------------------------------
 def predict_scores(text: str):
-    """Predict toxicity scores using fine-tuned XLM-R model."""
-    # Clean input text
-    cleaned_text = clean_text(text)
+    start_time = time.time()
+    cleaned = clean_text(text)
 
-    # Tokenize and move to model device
-    inputs = tokenizer(cleaned_text, return_tensors="pt", truncation=True, padding=True, max_length=256).to(model.device)
+    inputs = tokenizer(
+        cleaned,
+        return_tensors="np",
+        truncation=True,
+        padding=True,
+        max_length=64
+    )
 
-    with torch.no_grad():
-        outputs = model(**inputs)
-        probs = torch.sigmoid(outputs.logits).cpu().numpy()[0]  # multi-label sigmoid activation
+    start_time = time.perf_counter()
 
-    # Map probabilities to labels
+    outputs = session.run(None, dict(inputs))
+    end_time = time.perf_counter()
+    analysis_time_ms = (end_time - start_time) * 1000
+
+    logits = outputs[0][0]
+    probs = 1 / (1 + np.exp(-logits))
+
     scores = {label: float(p) for label, p in zip(labels, probs)}
+    overall = int(max(scores.values()) * 100)
 
-    # Overall classification logic
-    overall_score = int(max(scores.values()) * 100)
-    if overall_score > 75:
-        classification = "❌ TOXIC"
-    elif overall_score > 40:
-        classification = "⚠️ POTENTIALLY TOXIC"
+    if overall > 75:
+        classif = "❌ TOXIC"
+    elif overall > 40:
+        classif = "⚠️ POTENTIALLY TOXIC"
     else:
-        classification = "✅ NON-TOXIC"
+        classif = "✅ NON-TOXIC"
+
+    # analysis_time_ms = round((time.time() - start_time) * 1000, 2)
 
     return {
-        "overallScore": overall_score,
-        "classification": classification,
-        "categories": {label: round(score * 100) for label, score in scores.items()}
+        "overallScore": overall,
+        "classification": classif,
+        "categories": {k: round(v * 100) for k, v in scores.items()},
+        "analysisTime": analysis_time_ms
     }
 
+
+# CLI
 if __name__ == "__main__":
     if len(sys.argv) > 1:
-        input_text = sys.argv[1]
-        output = predict_scores(input_text)
-        # CHANGE 2: I removed 'ensure_ascii=False' to fix the emoji error.
-        print(json.dumps(output)) 
+        text = sys.argv[1]
+        print(json.dumps(predict_scores(text)))
     else:
         print(json.dumps({"error": "No input text provided"}))

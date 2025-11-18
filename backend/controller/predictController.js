@@ -26,11 +26,16 @@ exports.getDashboardStats = async (req, res) => {
         const dailyAnalyses = await Analysis.aggregate([
             { $match: { createdAt: { $exists: true, $gte: sevenDaysAgo } } },
             {
-                $group: {
-                    _id: { $dateToString: { format: "%Y-%m-%d", date: "$createdAt" } },
-                    count: { $sum: 1 }
+        $group: {
+            _id: { $dateToString: { format: "%Y-%m-%d", date: "$createdAt" } },
+            count: { $sum: 1 },
+            toxicCount: {
+                $sum: {
+                    $cond: [{ $gte: ["$results.overallScore", 50] }, 1, 0]
                 }
-            },
+            }
+        }
+    },
             { $sort: { _id: 1 } }
         ]);
         
